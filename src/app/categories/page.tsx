@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Category = {
   id: string;
@@ -14,14 +14,20 @@ export default function CategoriesPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  async function loadCategories() {
+  const loadCategories = useCallback(async () => {
     const res = await fetch("/api/categories");
-    setCategories(await res.json());
-  }
+
+    if (!res.ok) {
+      alert("Error al cargar las categorías.");
+      return;
+    }
+
+    setCategories((await res.json()) as Category[]);
+  }, []);
 
   useEffect(() => {
-    loadCategories();
-  }, []);
+    void loadCategories();
+  }, [loadCategories]);
 
   async function createCategory() {
     if (!name) return;
@@ -34,7 +40,7 @@ export default function CategoriesPage() {
 
     setName("");
     setDescription("");
-    loadCategories();
+    void loadCategories();
   }
 
   async function deleteCategory(id: string) {
@@ -46,7 +52,7 @@ export default function CategoriesPage() {
       alert("No se puede borrar una categoría con productos asociados.");
     }
 
-    loadCategories();
+    void loadCategories();
   }
 
   return (

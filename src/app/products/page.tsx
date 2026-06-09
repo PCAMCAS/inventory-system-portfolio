@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Product = {
   id: string;
@@ -26,7 +26,7 @@ export default function ProductsPage() {
   const [price, setPrice] = useState("1");
   const [stock, setStock] = useState("0");
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const params = new URLSearchParams();
 
     if (search) params.set("search", search);
@@ -37,13 +37,18 @@ export default function ProductsPage() {
       fetch("/api/categories"),
     ]);
 
-    setProducts(await productsRes.json());
-    setCategories(await categoriesRes.json());
-  }
+    if (!productsRes.ok || !categoriesRes.ok) {
+      alert("Error al cargar los datos del inventario.");
+      return;
+    }
+
+    setProducts((await productsRes.json()) as Product[]);
+    setCategories((await categoriesRes.json()) as Category[]);
+  }, [search, categoryId]);
 
   useEffect(() => {
-    loadData();
-  }, [search, categoryId]);
+    void loadData();
+  }, [loadData]);
 
   async function createProduct() {
     const selectedCategory = categoryId || categories[0]?.id;
@@ -63,12 +68,12 @@ export default function ProductsPage() {
     setName("");
     setPrice("1");
     setStock("0");
-    loadData();
+    void loadData();
   }
 
   async function deleteProduct(id: string) {
     await fetch(`/api/products/${id}`, { method: "DELETE" });
-    loadData();
+    void loadData();
   }
 
   async function updateStock(product: Product, nextStock: number) {
@@ -90,7 +95,7 @@ export default function ProductsPage() {
       setProducts(previous);
       alert("Error al actualizar stock. Se restaura el valor anterior.");
     } else {
-      loadData();
+      void loadData();
     }
   }
 
