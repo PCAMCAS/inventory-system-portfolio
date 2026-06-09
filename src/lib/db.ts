@@ -29,6 +29,62 @@ type MockProduct = {
   };
 };
 
+type SortField = "name" | "price" | "stock" | "createdAt";
+type SortDirection = "asc" | "desc";
+
+type MockProductOrderBy = Partial<Record<SortField, SortDirection>>;
+
+type MockProductFindManyArgs = {
+  where?: {
+    name?: {
+      contains?: string;
+      mode?: string;
+    };
+    categoryId?: string;
+  };
+  orderBy?: MockProductOrderBy;
+};
+
+type MockProductCreateArgs = {
+  data: {
+    name: string;
+    description?: string | null;
+    price: string | number;
+    stock?: string | number;
+    categoryId: string;
+  };
+};
+
+type MockProductUpdateArgs = {
+  where: {
+    id: string;
+  };
+  data: Partial<{
+    name: string;
+    description: string | null;
+    price: string | number;
+    stock: number;
+    categoryId: string;
+  }>;
+};
+
+type MockCategoryCreateArgs = {
+  data: {
+    name: string;
+    description?: string | null;
+  };
+};
+
+type MockCategoryUpsertArgs = {
+  where: {
+    name: string;
+  };
+  create: {
+    name: string;
+    description?: string | null;
+  };
+};
+
 const mockCategories: MockCategory[] = [
   {
     id: "cat-electronica",
@@ -82,11 +138,23 @@ const mockProducts: MockProduct[] = [
   },
 ];
 
-function sortMockProducts(products: MockProduct[], orderBy: any) {
-  const key = Object.keys(orderBy ?? { createdAt: "desc" })[0] ?? "createdAt";
-  const direction = orderBy?.[key] === "asc" ? 1 : -1;
+function getOrderBy(orderBy?: MockProductOrderBy): [SortField, SortDirection] {
+  const entries = Object.entries(orderBy ?? { createdAt: "desc" }) as [
+    SortField,
+    SortDirection,
+  ][];
 
-  return [...products].sort((a: any, b: any) => {
+  return entries[0] ?? ["createdAt", "desc"];
+}
+
+function sortMockProducts(
+  products: MockProduct[],
+  orderBy?: MockProductOrderBy
+): MockProduct[] {
+  const [key, sortDirection] = getOrderBy(orderBy);
+  const direction = sortDirection === "asc" ? 1 : -1;
+
+  return [...products].sort((a, b) => {
     if (key === "price" || key === "stock") {
       return (Number(a[key]) - Number(b[key])) * direction;
     }
@@ -95,10 +163,10 @@ function sortMockProducts(products: MockProduct[], orderBy: any) {
   });
 }
 
-function createMockDb() {
-  return {
+function createMockDb(): PrismaClient {
+  const mockDb = {
     product: {
-      findMany: async (args: any = {}) => {
+      findMany: async (args: MockProductFindManyArgs = {}) => {
         let products = [...mockProducts];
 
         const search = args.where?.name?.contains;
@@ -106,18 +174,20 @@ function createMockDb() {
 
         if (search) {
           products = products.filter((product) =>
-            product.name.toLowerCase().includes(String(search).toLowerCase())
+            product.name.toLowerCase().includes(search.toLowerCase())
           );
         }
 
         if (categoryId) {
-          products = products.filter((product) => product.categoryId === categoryId);
+          products = products.filter(
+            (product) => product.categoryId === categoryId
+          );
         }
 
         return sortMockProducts(products, args.orderBy);
       },
 
-      create: async (args: any) => {
+      create: async (args: MockProductCreateArgs) => {
         const category =
           mockCategories.find((item) => item.id === args.data.categoryId) ??
           mockCategories[0];
@@ -141,7 +211,7 @@ function createMockDb() {
         return product;
       },
 
-      update: async (args: any) => {
+      update: async (args: MockProductUpdateArgs) => {
         const product = mockProducts.find((item) => item.id === args.where.id);
 
         if (!product) {
@@ -161,7 +231,8 @@ function createMockDb() {
 
     category: {
       findMany: async () => mockCategories,
-      create: async (args: any) => {
+
+      create: async (args: MockCategoryCreateArgs) => {
         const category: MockCategory = {
           id: `cat-created-${Date.now()}`,
           name: args.data.name,
@@ -173,7 +244,8 @@ function createMockDb() {
         mockCategories.push(category);
         return category;
       },
-      upsert: async (args: any) => {
+
+      upsert: async (args: MockCategoryUpsertArgs) => {
         const existing = mockCategories.find(
           (category) => category.name === args.where.name
         );
@@ -193,21 +265,24 @@ function createMockDb() {
         mockCategories.push(category);
         return category;
       },
+
       deleteMany: async () => ({ count: 0 }),
       delete: async () => mockCategories[0],
     },
 
     $disconnect: async () => undefined,
   };
+
+  return mockDb as unknown as PrismaClient;
 }
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   pool: Pool | undefined;
-  mockDb: ReturnType<typeof createMockDb> | undefined;
+  mockDb: PrismaClient | undefined;
 };
 
-function createPrismaClient() {
+function createPrismaClient(): PrismaClient {
   const pool =
     globalForPrisma.pool ??
     new Pool({
@@ -231,7 +306,7 @@ function createPrismaClient() {
   return prisma;
 }
 
-export const db =
+export const db: PrismaClient =
   process.env.E2E_MOCKS === "1"
-    ? ((globalForPrisma.mockDb ??= createMockDb()) as any)
+    ? (globalForPrisma.mockDb ??= createMockDb())
     : createPrismaClient();

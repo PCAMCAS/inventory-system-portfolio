@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatPrice } from "@/lib/product-utils";
 import type { Product } from "@/types/product";
 
@@ -8,7 +8,7 @@ export function ProductList() {
   const [products, setProducts] = useState<Product[]>([]);
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
-  async function loadProducts() {
+  const loadProducts = useCallback(async () => {
     setStatus("loading");
 
     try {
@@ -24,11 +24,11 @@ export function ProductList() {
     } catch {
       setStatus("error");
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    void loadProducts();
+  }, [loadProducts]);
 
   if (status === "loading") {
     return <div role="progressbar">Cargando productos...</div>;
