@@ -16,6 +16,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://user:password@localhost:5432/inventory
+      DIRECT_URL: postgresql://user:password@localhost:5432/inventory
       E2E_MOCKS: "1"
 
     steps:
